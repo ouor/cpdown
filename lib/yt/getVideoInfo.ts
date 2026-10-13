@@ -1,8 +1,12 @@
-import { memoize } from "@fxts/core"
 import { ofetch } from "ofetch"
 
 // Helper function to communicate with main world script
-const getYtInitialPlayerResponse = (): Promise<any | null> => {
+const requestMainWorld = <T>(
+  type: string,
+  responseType: string,
+  videoId: string,
+  timeout: number,
+): Promise<T | null> => {
   return new Promise((resolve) => {
     const requestId = Math.random().toString(36).substring(7)
 
@@ -11,39 +15,45 @@ const getYtInitialPlayerResponse = (): Promise<any | null> => {
       if (event.source !== window) return
 
       if (
-        event.data.type === "YT_INITIAL_PLAYER_RESPONSE" &&
+        event.data.type === responseType &&
         event.data.requestId === requestId
       ) {
         window.removeEventListener("message", handleMessage)
-        resolve(event.data.data)
+        resolve(event.data.data ?? null)
       }
     }
 
     window.addEventListener("message", handleMessage)
 
     // Request data from main world script
-    window.postMessage(
-      {
-        type: "GET_YT_INITIAL_PLAYER_RESPONSE",
-        requestId: requestId,
-      },
-      "*",
-    )
+    window.postMessage({ type, requestId, videoId }, "*")
 
-    // Timeout after 1 second if no response
+    // Timeout if no response
     setTimeout(() => {
       window.removeEventListener("message", handleMessage)
       resolve(null)
-    }, 1000)
+    }, timeout)
   })
 }
 
-export const getVideoInfo = memoize(async (videoId: string) => {
-  // First try to get from main world script
-  const { ytInitialPlayerResponse, pot } = await getYtInitialPlayerResponse()
+// Returns the PO token bound to `videoId`, required by the timedtext API.
+// Not memoized: capturing it may fail transiently (e.g. during an ad).
+export const getPot = async (videoId: string) =>
+  (await requestMainWorld<string>("GET_YT_POT", "YT_POT", videoId, 5000)) ?? ""
 
-  if (ytInitialPlayerResponse) {
-    return { r: ytInitialPlayerResponse, pot }
+// Not memoized: caption URLs in the response expire, and the main-world
+// lookup is cheap.
+export const getVideoInfo = async (videoId: string) => {
+  // First try to get from main world script
+  const playerResponse = await requestMainWorld<Response>(
+    "GET_YT_INITIAL_PLAYER_RESPONSE",
+    "YT_INITIAL_PLAYER_RESPONSE",
+    videoId,
+    1000,
+  )
+
+  if (playerResponse) {
+    return { r: playerResponse }
   }
 
   const r = await ofetch<Response>(
@@ -63,8 +73,8 @@ export const getVideoInfo = memoize(async (videoId: string) => {
     },
   )
 
-  return { r, pot }
-})
+  return { r }
+}
 
 interface Response {
   responseContext: ResponseContext

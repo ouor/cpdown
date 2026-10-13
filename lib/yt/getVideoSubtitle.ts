@@ -1,6 +1,6 @@
 import { ofetch } from "ofetch"
 import { getSelectedCaption } from "@/lib/yt/getSelectedCaption"
-import { getVideoInfo } from "@/lib/yt/getVideoInfo"
+import { getPot, getVideoInfo } from "@/lib/yt/getVideoInfo"
 
 type CaptionTrackLike = {
   baseUrl?: string
@@ -24,7 +24,7 @@ const isOriginalAsr = (t: CaptionTrackLike) =>
 // Not memoized: the user may switch caption tracks between invocations, so
 // the returned SRT must reflect the current selection.
 export const getVideoSubtitle = async (videoId: string) => {
-  const [{ r, pot }, selected] = await Promise.all([
+  const [{ r }, selected] = await Promise.all([
     getVideoInfo(videoId),
     getSelectedCaption(),
   ])
@@ -108,11 +108,16 @@ export const getVideoSubtitle = async (videoId: string) => {
     return null
   }
 
+  const pot = await getPot(videoId)
+
   const { origin, pathname, searchParams } = new URL(url)
 
   searchParams.set("fmt", "srt")
   searchParams.set("c", "WEB")
-  searchParams.set("pot", pot)
+  if (pot) {
+    searchParams.set("pot", pot)
+    searchParams.set("potc", "1")
+  }
 
   const srt = await ofetch<string>(`${origin}${pathname}?${searchParams}`, {
     parseResponse: (txt) => txt,
