@@ -1,5 +1,6 @@
 import { browser } from "wxt/browser"
 import { showNotification } from "@/lib/showNotification"
+import { channelTabPattern } from "@/lib/yt/getChannelMarkdown"
 
 // Helper function to check if a URL can be injected with scripts
 function isInjectableUrl(url?: string): boolean {
@@ -105,20 +106,28 @@ export default defineBackground(() => {
       const isYoutube = url?.includes("youtube.com")
 
       if (url && isYoutube) {
-        const { searchParams } = new URL(url)
+        const { pathname, searchParams } = new URL(url)
 
         const videoId = searchParams.get("v")
 
-        if (!videoId) {
-          throw new Error("No video ID found")
+        if (videoId) {
+          browser.tabs.sendMessage(activeTab.id!, {
+            type: "COPY_YOUTUBE_SUBTITLE",
+            payload: videoId,
+          })
+
+          return
         }
 
-        browser.tabs.sendMessage(activeTab.id!, {
-          type: "COPY_YOUTUBE_SUBTITLE",
-          payload: videoId,
-        })
+        if (channelTabPattern.test(pathname)) {
+          browser.tabs.sendMessage(activeTab.id!, {
+            type: "COPY_YOUTUBE_CHANNEL",
+          })
 
-        return
+          return
+        }
+
+        // Other YouTube pages are copied like any other webpage.
       }
 
       // Execute a script in the tab to get the body content

@@ -100,6 +100,33 @@ export default defineUnlistedScript(() => {
     return pot
   }
 
+  // `ytInitialData` only describes the first page load. The visible
+  // <ytd-browse> element holds the current channel tab's response, including
+  // items appended by infinite scroll.
+  const getChannelData = () => {
+    const browse = [
+      ...document.querySelectorAll<HTMLElement>(
+        'ytd-browse[page-subtype="channels"]',
+      ),
+    ].find((el) => !el.hidden) as any
+    const data = browse?.data
+    if (!data) return null
+
+    const tab = data.contents?.twoColumnBrowseResultsRenderer?.tabs?.find(
+      (t: any) => t.tabRenderer?.selected,
+    )?.tabRenderer
+
+    // Send only what the content script needs, as plain JSON.
+    return JSON.parse(
+      JSON.stringify({
+        header: data.header,
+        metadata: data.metadata,
+        microformat: data.microformat,
+        tab,
+      }),
+    )
+  }
+
   // Listen for messages from the content script
   window.addEventListener("message", async (event) => {
     if (event.source !== window) return
@@ -109,6 +136,24 @@ export default defineUnlistedScript(() => {
         {
           type: "YT_INITIAL_PLAYER_RESPONSE",
           data: getPlayerResponse(event.data.videoId),
+          requestId: event.data.requestId,
+        },
+        "*",
+      )
+    }
+
+    if (event.data.type === "GET_YT_CHANNEL_DATA") {
+      let data = null
+      try {
+        data = getChannelData()
+      } catch (error) {
+        console.error("Error reading channel data:", error)
+      }
+
+      window.postMessage(
+        {
+          type: "YT_CHANNEL_DATA",
+          data,
           requestId: event.data.requestId,
         },
         "*",

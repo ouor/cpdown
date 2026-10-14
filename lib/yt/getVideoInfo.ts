@@ -1,45 +1,11 @@
 import { ofetch } from "ofetch"
-
-// Helper function to communicate with main world script
-const requestMainWorld = <T>(
-  type: string,
-  responseType: string,
-  videoId: string,
-  timeout: number,
-): Promise<T | null> => {
-  return new Promise((resolve) => {
-    const requestId = Math.random().toString(36).substring(7)
-
-    // Listen for response from main world script
-    const handleMessage = (event: MessageEvent) => {
-      if (event.source !== window) return
-
-      if (
-        event.data.type === responseType &&
-        event.data.requestId === requestId
-      ) {
-        window.removeEventListener("message", handleMessage)
-        resolve(event.data.data ?? null)
-      }
-    }
-
-    window.addEventListener("message", handleMessage)
-
-    // Request data from main world script
-    window.postMessage({ type, requestId, videoId }, "*")
-
-    // Timeout if no response
-    setTimeout(() => {
-      window.removeEventListener("message", handleMessage)
-      resolve(null)
-    }, timeout)
-  })
-}
+import { requestMainWorld } from "@/lib/yt/requestMainWorld"
 
 // Returns the PO token bound to `videoId`, required by the timedtext API.
 // Not memoized: capturing it may fail transiently (e.g. during an ad).
 export const getPot = async (videoId: string) =>
-  (await requestMainWorld<string>("GET_YT_POT", "YT_POT", videoId, 5000)) ?? ""
+  (await requestMainWorld<string>("GET_YT_POT", "YT_POT", { videoId }, 5000)) ??
+  ""
 
 // Not memoized: caption URLs in the response expire, and the main-world
 // lookup is cheap.
@@ -48,7 +14,7 @@ export const getVideoInfo = async (videoId: string) => {
   const playerResponse = await requestMainWorld<Response>(
     "GET_YT_INITIAL_PLAYER_RESPONSE",
     "YT_INITIAL_PLAYER_RESPONSE",
-    videoId,
+    { videoId },
     1000,
   )
 

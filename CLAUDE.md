@@ -111,6 +111,7 @@ Load the unpacked extension during development:
 The extension uses message passing between background and content scripts:
 - `COPY_TEXT` - Process regular webpage content
 - `COPY_YOUTUBE_SUBTITLE` - Handle YouTube video subtitles
+- `COPY_YOUTUBE_CHANNEL` - Copy a channel's video list (`/videos`, `/shorts`, `/streams` tabs)
 - `OPEN_CONFETTI` - Trigger Raycast confetti (background only)
 
 ### YouTube API Integration

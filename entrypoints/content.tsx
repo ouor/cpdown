@@ -10,6 +10,7 @@ import { Noti, showNotification } from "@/lib/showNotification"
 import { getOptions } from "@/lib/storage"
 import { defaultTagsToRemove } from "@/lib/tagsToRemove"
 import { convertSrtToText } from "@/lib/yt/convertSrtToText"
+import { getChannelMarkdown } from "@/lib/yt/getChannelMarkdown"
 import { getVideoInfo } from "@/lib/yt/getVideoInfo"
 import { getVideoSubtitle } from "@/lib/yt/getVideoSubtitle"
 
@@ -171,6 +172,34 @@ export default defineContentScript({
           showConfetti,
           sendResponse,
           successMessagePrefix: "Copied as markdown",
+          pageUrl: prependPageUrl ? window.location.href : undefined,
+        })
+
+        return true
+      }
+
+      if (msg.type === "COPY_YOUTUBE_CHANNEL") {
+        const {
+          showSuccessToast,
+          showConfetti,
+          wrapInTripleBackticks,
+          prependPageUrl,
+        } = await getOptions()
+
+        const markdown = await getChannelMarkdown()
+
+        if (!markdown) {
+          showNotification("Could not read the channel video list", "error")
+          return sendResponse({ success: false, error: "No channel data" })
+        }
+
+        await copyAndNotify({
+          markdown,
+          wrapInTripleBackticks,
+          showSuccessToast,
+          showConfetti,
+          sendResponse,
+          successMessagePrefix: "Channel video list copied",
           pageUrl: prependPageUrl ? window.location.href : undefined,
         })
 
